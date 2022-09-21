@@ -1,0 +1,266 @@
+---
+title: "Whether Publication date Affected the Length and the theme of Philosophy Schools'Sentences."
+output:
+  html_document: default
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction:
+
+```{r}
+#read the data set
+data <- read.csv("/Users/jiaxifang/Desktop/Applied Data Science/philosophy_data.csv")
+```
+
+```{r}
+library(dplyr)
+library(tm)
+library(tm)
+library(tidytext)
+library(dplyr)
+library(ggplot2)
+library(wordcloud)
+```
+
+
+
+Before thinking what I want to analyze in this data set, I want to have a basic view about what this data set have. 
+
+```{r}
+count_of_school_author<-data %>%
+  select(school,author)%>%
+  group_by(school,author)%>%
+  count%>%
+  arrange(school,author)
+count_of_school_author
+
+```
+From the table above, it's obvious the sentences in the data set came from a large number of authors in different philosophy schools.
+
+Now, I want to know the percentage of sentences that each school have contributed to this data set.
+```{r}
+
+count_of_schools<-count_of_school_author%>%
+  group_by(school)%>%
+  summarise(count=sum(n))
+
+pie(count_of_schools$count,label=count_of_schools$school,main="The percentage of each school's sentences")
+```
+
+
+Through these pictures, it is obvious the data set record the sentences of different authors from different philosophy schools. 
+
+Now I focus on publication date, which I haven't analyzed yet. In the data set, all sentences have been recorded the publication date. So I'm interested in whether publication date can affect the sentences of philosophy schools. 
+
+I have two hypotheses:
+  1: If the publication date affects the length of sentence?
+  2: If the publication date affects the theme of sentence?
+
+
+
+## Question 1: If the publication date affects the length of sentence?
+
+
+
+
+First of all, I need to divide the whole time period into 3. 
+Because the sentences published before 1650 were not so many, The first time period is before 1650. After 1650, there are a large number of new philosophy sentences, so I divide it into two time period by 1850.
+```{r}
+publish_date_1 <- data %>%
+  filter(original_publication_date < 1650)
+
+publish_date_2 <- data %>%
+  filter((original_publication_date >= 1650) &
+           (original_publication_date < 1850))
+
+publish_date_3 <- data %>%
+  filter(original_publication_date >=1850)
+
+```
+
+
+
+Secondly, I need to get the relationship between length and date.
+```{r}
+#For period before 1650
+ggplot(publish_date_1,aes(original_publication_date,color=school))+geom_point(aes(y=sentence_length,fill=school),stat = "identity")+labs(x="Publication Date",y="Sentence Length",title="Period 1")
+
+```
+```{r}
+#For period after 1650 and before 1850
+ggplot(publish_date_2,aes(original_publication_date,color=school))+geom_point(aes(y=sentence_length,fill=school),stat = "identity")+labs(x="Publication Date",y="Sentence Length",title="Period 2")
+
+```
+
+```{r}
+#For period after 1850
+ggplot(publish_date_3,aes(original_publication_date,color=school))+geom_point(aes(y=sentence_length,fill=school),stat = "identity")+labs(x="Publication Date",y="Sentence Length",title="Period 3")
+
+```
+
+Based on the pictures above, the length difference is large in period 1 and is small in period 2 and 3. 
+
+To check if the result is accurate enough, I need to check the variance and mean values of sentences lengths in different periods.
+```{r}
+print(paste0("The variance and mean value of sentences in period 1 is"," ",var(publish_date_1$sentence_length)," ","and"," ",mean(publish_date_1$sentence_length)))
+print(paste0("The variance and mean value of sentences in period 2 is"," ",var(publish_date_2$sentence_length)," ","and"," ",mean(publish_date_2$sentence_length)))
+print(paste0("The variance and mean value of sentences in period 3 is"," ",var(publish_date_3$sentence_length)," ","and"," ",mean(publish_date_3$sentence_length)))
+```
+So based on the pictures and calculation results above, we can see the mean value of lengths is close in period 1 and period 3.The mean value is a bit more different in period 2. The variance before 1650 is smaller than that in other two periods, and the variance between 1650 and 1850 is the largest.
+
+Because of the fluctuation of lengths, we can conclude that publication date can affect sentence length.In different period, the lengths of philosophy schools' sentences are greatly different.
+
+
+
+
+
+## Question 2: If the publication date affects the theme of sentence?
+
+
+
+
+
+Firstly, I need to get the frequencies of each word in different periods.
+
+
+For the period before 1650
+
+
+```{r}
+text_period_1<-Corpus(VectorSource(publish_date_1$sentence_lowered))%>%
+  tm_map(removeWords,stopwords(""))%>%
+  tm_map(removeWords,character(0))%>%
+  tm_map(removePunctuation)%>%
+  tm_map(stripWhitespace)
+word_Matrix1<- TermDocumentMatrix(text_period_1)%>%
+  removeSparseTerms(sparse=0.99)%>%
+  tidy()
+word_Matrix1_Final<-summarise(group_by(word_Matrix1,term),sum(count))
+word_Matrix1_Final2<-word_Matrix1_Final%>%
+  mutate(perc=`sum(count)`/sum(`sum(count)`))%>%
+  arrange(desc(perc))
+head(word_Matrix1_Final2,100)
+  
+```
+
+
+Through the code above, I have got the the percentage of each word, now I want to visualize the result.
+
+
+```{r}
+wordcloud(word_Matrix1_Final$term,word_Matrix1_Final$`sum(count)`,min.freq=200,col=brewer.pal(12,"Dark2"),rot.per=0.1)
+```
+
+
+Through the picture, it is obvious the words such as "nature", "animal", "reason", "soul", and "people" have relatively high frequency in all nouns. Common words like "one", "will", and "also" are skipped. These high frequency nouns represents the themes of philosophy schools before 1650.
+
+Now, I need to repeat this step for other two periods.
+
+For the period after 1650 and before 1850.
+
+```{r}
+text_period_2<-Corpus(VectorSource(publish_date_2$sentence_lowered))%>%
+  tm_map(removeWords,stopwords(""))%>%
+  tm_map(removeWords,character(0))%>%
+  tm_map(removePunctuation)%>%
+  tm_map(stripWhitespace)
+word_Matrix2<- TermDocumentMatrix(text_period_2)%>%
+  removeSparseTerms(sparse=0.99)%>%
+  tidy()
+word_Matrix2_Final<-summarise(group_by(word_Matrix2,term),sum(count))
+word_Matrix2_Final2<-word_Matrix2_Final%>%
+  mutate(perc=`sum(count)`/sum(`sum(count)`))%>%
+  arrange(desc(perc))
+head(word_Matrix2_Final2,100)
+```
+
+```{r}
+wordcloud(word_Matrix2_Final$term,word_Matrix2_Final$`sum(count)`,min.freq=200,col=brewer.pal(12,"Dark2"),rot.per=0.1)
+```
+
+
+Through the picture above, we can see the nouns like "nature", "god", "idea", "relation", and "reason" have relatively high frequency between 1650 and 1850.
+
+For the period 3
+```{r}
+text_period_3<-Corpus(VectorSource(publish_date_3$sentence_lowered))%>%
+  tm_map(removeWords,stopwords(""))%>%
+  tm_map(removeWords,character(0))%>%
+  tm_map(removePunctuation)%>%
+  tm_map(stripWhitespace)
+word_Matrix3<- TermDocumentMatrix(text_period_3)%>%
+  removeSparseTerms(sparse=0.99)%>%
+  tidy()
+word_Matrix3_Final<-summarise(group_by(word_Matrix3,term),sum(count))
+word_Matrix3_Final2<-word_Matrix3_Final%>%
+  mutate(perc=`sum(count)`/sum(`sum(count)`))%>%
+  arrange(desc(perc))
+head(word_Matrix3_Final2,100)
+```
+
+```{r}
+wordcloud(word_Matrix3_Final$term,word_Matrix3_Final$`sum(count)`,min.freq=200,col=brewer.pal(12,"Dark2"),rot.per=0.1)
+```
+
+
+Through the picture above, there are high frequency nouns including "fact", "nature", "world", "language", and "truth".
+
+By the pictures, I can have a basic view to the high frequency words in 3 periods.There are a lot of words repeatedly appearing in three periods. 
+
+Secondly, to accurately check if the themes of these sentences have been changed by time, I need to select 8 nouns from period 1 and track if their percentages got be fluctuated.
+
+```{r}
+nouns_1<-subset(word_Matrix1_Final2,perc>0.005)
+print(nouns_1,50)
+```
+In the table above, I choose "nature", "body", "men", "animals", "people", "reason", "soul", "motion". Now I need to check the percentage change of these nouns.
+
+```{r}
+nouns_selected<-c("nature", "body", "men", "animals", "people", "reason", "soul", "motion")
+nouns_perc1<-word_Matrix1_Final2%>%
+  filter(term%in%nouns_selected)%>%
+  mutate(period="One")
+print(nouns_perc1)  
+```
+
+For the selected words in perido 2:
+```{r}
+nouns_perc2<-word_Matrix2_Final2%>%
+  filter(term%in%nouns_selected)%>%
+  mutate(period="Two")
+print(nouns_perc2)  
+```
+For period 3:
+```{r}
+nouns_perc3<-word_Matrix3_Final2%>%
+  filter(term%in%nouns_selected)%>%
+  mutate(period="Three")
+print(nouns_perc3)  
+```
+
+Now, I need to visualize the result.
+```{r}
+rbind(nouns_perc1,nouns_perc2,nouns_perc3)%>%
+  ggplot(aes(term,color=period))+geom_point(aes(y=`perc`,fill=period),stat = "identity")+labs(x="nouns",y="percentage")
+
+```
+
+
+
+Conclusively, the percentage change of each noun is large. So we can conclude the time change can cause the change of the theme in philosophy schools' sentences.
+
+
+
+
+
+
+### Conclusion: Through the analysis above, it is obvious that publication date plays an important role in the sentences of philosophy schools. With time change, the lengths and themes of these sentences can vary largely. The reason might caused by the change of society, but it still need more evidence as support. 
+
+
+
+
+
+
